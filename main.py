@@ -1,12 +1,15 @@
 import pandas as pd
 import requests
 import logging
+import os
+import argparse
 
 # Налаштування логера
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
+# Базовий клієнт для роботи з API
 class SWAPIClient:
     def __init__(self, base_url: str):
         self.base_url = base_url
@@ -26,8 +29,25 @@ class SWAPIClient:
         return all_data
 
 
+# Клієнт для роботи з даними з Excel
+class ExcelSWAPIClient:
+    def __init__(self, file_path: str):
+        self.file_path = file_path
+
+    def fetch_json(self, endpoint: str) -> list:
+        logger.info(f"Читання даних з файлу {self.file_path} для endpoint {endpoint}")
+        try:
+            # Читаємо Excel файл
+            df = pd.read_excel(self.file_path, sheet_name=endpoint)
+            return df.to_dict(orient='records')
+        except ValueError:
+            logger.error(f"Лист {endpoint} не знайдено в файлі {self.file_path}.")
+            return []
+
+
+# Менеджер даних
 class SWAPIDataManager:
-    def __init__(self, client: SWAPIClient):
+    def __init__(self, client):
         self.client = client
         self.data = {}
 
@@ -51,12 +71,36 @@ class SWAPIDataManager:
         logger.info("Дані успішно записано у Excel.")
 
 
-client = SWAPIClient(base_url="https://swapi.dev/api/")
-manager = SWAPIDataManager(client)
+# Функція для вибору клієнта
+def get_client(input_source: str):
+    if input_source.startswith("http"):
+        return SWAPIClient(base_url=input_source)
+    elif input_source.endswith(".xlsx"):
+        return ExcelSWAPIClient(file_path=input_source)
+    else:
+        raise ValueError("Невідомий формат джерела даних")
 
-manager.fetch_entity("people")
-manager.fetch_entity("planets")
 
-manager.apply_filter("people", ["films", "species"])
+# Основна функція
+def main():
+    parser = argparse.ArgumentParser(description="SWAPI Data Manager")
+    parser.add_argument('--input', required=True, help="URL або шлях до Excel файлу")
+    parser.add_argument('--endpoint', required=True, help="Кома-розділений список endpoint'ів")
+    parser.add_argument('--output', required=True, help="Шлях до вихідного Excel файлу")
 
-manager.save_to_excel("swapi_data.xlsx")
+    args = parser.parse_args()
+
+    # Вибір клієнта для підключення до джерела
+    client = get_client(args.input)
+    manager = SWAPIDataManager(client)
+
+    # Завантаження даних з зазначених endpoint'ів
+    for endpoint in args.endpoint.split(','):
+        manager.fetch_entity(endpoint)
+
+    # Запис результатів у Excel файл
+    manager.save_to_excel(args.output)
+
+
+if __name__ == "__main__":
+    main()
