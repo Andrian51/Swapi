@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 # Базовий клієнт для роботи з API
 class SWAPIClient:
-    def __init__(self, base_url: str):
-        self.base_url = base_url
+    def __init__(self, path: str):
+        self.base_url = path
 
     def fetch_json(self, endpoint: str) -> list:
         all_data = []
@@ -30,19 +30,26 @@ class SWAPIClient:
 
 
 # Клієнт для роботи з даними з Excel
-class ExcelSWAPIClient:
-    def __init__(self, file_path: str):
-        self.file_path = file_path
+class ExcelSWAPIClient(SWAPIClient):
+    def __init__(self, path: str):
+        """
+        Ініціалізація з шляхом до Excel-файлу.
+        """
+        super().__init__(path)
+        self.data = pd.read_excel(path, sheet_name=None)
 
     def fetch_json(self, endpoint: str) -> list:
-        logger.info(f"Читання даних з файлу {self.file_path} для endpoint {endpoint}")
-        try:
-            # Читаємо Excel файл
-            df = pd.read_excel(self.file_path, sheet_name=endpoint)
-            return df.to_dict(orient='records')
-        except ValueError:
-            logger.error(f"Лист {endpoint} не знайдено в файлі {self.file_path}.")
+        """
+        Завантажує дані з Excel-файлу для вказаного endpoint.
+
+        :param endpoint: Назва листа в Excel (наприклад, "people")
+        :return: список всіх сутностей у вигляді JSON
+        """
+        if endpoint not in self.data:
+            logger.warning(f"Endpoint {endpoint} not found in {self.path}")
             return []
+
+        return self.data[endpoint].to_dict(orient='records')
 
 
 # Менеджер даних
@@ -74,9 +81,9 @@ class SWAPIDataManager:
 # Функція для вибору клієнта
 def get_client(input_source: str):
     if input_source.startswith("http"):
-        return SWAPIClient(base_url=input_source)
+        return SWAPIClient(input_source)
     elif input_source.endswith(".xlsx"):
-        return ExcelSWAPIClient(file_path=input_source)
+        return ExcelSWAPIClient(input_source)
     else:
         raise ValueError("Невідомий формат джерела даних")
 
