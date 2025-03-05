@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import pandas as pd
 
 
 class DataFetcher(ABC):
@@ -7,16 +8,19 @@ class DataFetcher(ABC):
         pass
 
 
-class DataProcessor(ABC):
+class DataProviderInterface(ABC):
     @abstractmethod
-    def apply_filter(self, endpoint: str, columns_to_drop: list):
+    def fetch_data(self, endpoint: str):
         pass
 
-    def register_processor(self, entity: str, processor=None):
+
+class DataProcessor(ABC):
+    @abstractmethod
+    def process(self, data: pd.DataFrame) -> pd.DataFrame:
         pass
 
 
 class DataSaver(ABC):
     @abstractmethod
-    def save_to_excel(self, filename: str):
+    def save(self, data: pd.DataFrame, filename: str):
         pass
